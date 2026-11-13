@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конструктор сайта — собери промпт для Qwen</title>
+<style>
+  :root {
+    --violet: #6C3BF5; --violet-dark: #4B22C9; --violet-soft: #E6DDFF; --lav: #F4F0FF;
+    --yellow: #FFD43B; --yellow-dark: #F2B705; --lime: #B9F24A;
+    --ink: #1E1640; --muted: #6B6488; --white: #FFFFFF; --radius: 24px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--ink); background: var(--lav); line-height: 1.4;
+    font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  }
+  header { background: var(--violet); color: var(--white); padding: 28px 20px 64px; position: relative; overflow: hidden; }
+  header::before, header::after { content: ""; position: absolute; border-radius: 50%; }
+  header::before { width: 220px; height: 220px; background: var(--yellow); right: -60px; top: -80px; }
+  header::after { width: 120px; height: 120px; background: var(--lime); right: 150px; bottom: -70px; }
+  .head-in { max-width: 1180px; margin: 0 auto; position: relative; z-index: 1; }
+  .badge { display: inline-block; background: var(--yellow); color: var(--ink); font-weight: 800; font-size: 14px; padding: 6px 14px; border-radius: 999px; }
+  .other { color: var(--white); font-weight: 700; font-size: 15px; margin-left: 10px; }
+  h1 { font-size: clamp(28px, 5vw, 46px); margin: 14px 0 8px; line-height: 1.1; max-width: 760px; }
+  header p { margin: 0; font-size: clamp(17px, 2.2vw, 21px); max-width: 640px; opacity: .95; }
+
+  main {
+    max-width: 1180px; margin: -40px auto 0; padding: 0 16px 60px;
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 20px;
+    position: relative; z-index: 2; align-items: start;
+  }
+  .card { background: var(--white); border-radius: var(--radius); padding: 22px; box-shadow: 0 6px 0 var(--violet-soft); margin-bottom: 20px; }
+  .step { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; }
+  .num { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--violet); color: var(--white); display: grid; place-items: center; font-weight: 900; font-size: 22px; }
+  h2 { font-size: 24px; margin: 0; }
+  h3 { margin: 18px 0 10px; font-size: 18px; }
+  .hint { color: var(--muted); font-size: 16px; margin: -8px 0 14px 56px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+  .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .tile {
+    font: inherit; color: inherit; cursor: pointer; position: relative; min-width: 0;
+    background: var(--lav); border: 3px solid transparent; border-radius: 20px;
+    padding: 14px 8px 12px; min-height: 100px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    font-weight: 800; font-size: 16px; text-align: center;
+    transition: transform .12s, background .12s, border-color .12s;
+  }
+  .tile .em { font-size: 36px; line-height: 1; }
+  .tile small { font-weight: 600; font-size: 13px; color: var(--muted); }
+  .tile:hover { transform: translateY(-3px); background: var(--violet-soft); }
+  .tile:active { transform: scale(.96); }
+  .tile[aria-pressed="true"] { background: var(--white); border-color: var(--violet); box-shadow: 0 5px 0 var(--violet); }
+  .tile[aria-pressed="true"]::after {
+    content: "✓"; position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--yellow); color: var(--ink); font-weight: 900; display: grid; place-items: center; border: 3px solid var(--white);
+  }
+  .tile:focus-visible, .btn:focus-visible, input:focus-visible, textarea:focus-visible, .mv:focus-visible { outline: 4px solid var(--yellow-dark); outline-offset: 3px; }
+  .stripes { display: flex; width: 72px; height: 40px; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 2px rgba(30,22,64,.12); }
+  .stripes i { flex: 1; }
+
+  input[type="text"], textarea.field {
+    width: 100%; font: inherit; font-size: 18px; font-weight: 700; color: var(--ink);
+    padding: 14px 18px; border-radius: 16px; border: 3px solid var(--violet-soft); background: var(--lav);
+  }
+  textarea.field { font-weight: 600; min-height: 96px; resize: vertical; }
+  .own { margin-top: 14px; }
+  .own label { display: block; font-weight: 800; margin-bottom: 6px; }
+  .pickers { display: none; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+  .pickers.on { display: flex; }
+  .pickers label { display: flex; align-items: center; gap: 8px; font-weight: 800; background: var(--lav); padding: 8px 14px 8px 8px; border-radius: 14px; }
+  .pickers input { width: 44px; height: 44px; border: none; padding: 0; background: none; cursor: pointer; }
+
+  .order { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .order li { display: flex; align-items: center; gap: 10px; background: var(--lav); border-radius: 14px; padding: 8px 10px 8px 14px; font-weight: 800; }
+  .order li.lock { opacity: .6; }
+  .order li span.n { color: var(--violet); width: 22px; }
+  .order li .sp { flex: 1; }
+  .mv { font: inherit; font-weight: 900; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--white); color: var(--violet); cursor: pointer; }
+  .mv:disabled { opacity: .3; cursor: default; }
+
+  aside { position: sticky; top: 16px; }
+  .browser { border: 4px solid var(--ink); border-radius: 18px; overflow: hidden; }
+  .bar { background: var(--ink); padding: 6px 10px; display: flex; gap: 6px; }
+  .bar i { width: 10px; height: 10px; border-radius: 50%; background: #FF5F57; }
+  .bar i:nth-child(2) { background: #FEBC2E; } .bar i:nth-child(3) { background: #28C840; }
+  .site { height: 300px; overflow: hidden; font-size: 12px; }
+  .s-nav { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; font-weight: 900; }
+  .s-nav b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+  .s-nav span { display: flex; gap: 6px; } .s-nav span i { width: 22px; height: 5px; border-radius: 3px; opacity: .6; }
+  .s-hero { padding: 18px 14px; display: flex; align-items: center; gap: 10px; }
+  .s-hero div { flex: 1; min-width: 0; }
+  .s-hero h4 { margin: 0 0 6px; font-size: 20px; line-height: 1.1; overflow-wrap: anywhere; }
+  .s-hero p { margin: 0 0 8px; opacity: .75; }
+  .s-btn { display: inline-block; padding: 5px 12px; font-weight: 900; }
+  .s-emoji { font-size: 48px; }
+  .s-sec { margin: 6px 12px; padding: 8px 10px; font-weight: 800; display: flex; gap: 6px; }
+  .sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+  .sum li { background: var(--lav); border-radius: 999px; padding: 5px 12px; font-size: 14px; font-weight: 700; }
+
+  h2.small { font-size: 20px; margin: 0 0 10px; }
+  textarea#prompt {
+    width: 100%; height: 240px; resize: vertical; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--ink);
+    background: var(--lav); border: 3px solid var(--violet-soft); border-radius: 16px; padding: 12px;
+  }
+  .btn {
+    font: inherit; font-weight: 900; font-size: 19px; cursor: pointer; text-decoration: none;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; min-height: 62px; border-radius: 18px; border: none; margin-top: 12px; transition: transform .1s, box-shadow .1s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: none !important; }
+  .btn-copy { background: var(--yellow); color: var(--ink); box-shadow: 0 6px 0 var(--yellow-dark); }
+  .btn-qwen { background: var(--violet); color: var(--white); box-shadow: 0 6px 0 var(--violet-dark); }
+  .btn-copy.done { background: var(--lime); box-shadow: 0 6px 0 #8CC52A; }
+  .how { margin: 16px 0 0; padding: 0 0 0 22px; color: var(--muted); font-size: 15px; }
+  .how li { margin-bottom: 4px; } .how b { color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
+  @media (max-width: 940px) { main { grid-template-columns: 1fr; } aside { position: static; } .hint { margin-left: 0; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-in">
+    <span class="badge">Для учеников 1–9 класса</span>
+    <a class="other" href="https://va1t300.github.io/konstruktor-prompta/">🎮 Конструктор игры →</a>
+    <h1>Собери свой сайт</h1>
+    <p>Придумай название, тему, цвета и блоки. Потом скопируй волшебный текст и отдай его нейросети Qwen — она сделает сайт!</p>
+  </div>
+</header>
+
+<main>
+  <div>
+    <section class="card">
+      <div class="step"><span class="num">1</span><h2>Как называется сайт?</h2></div>
+      <input type="text" id="name" maxlength="40" placeholder="Например: Мир динозавров" aria-label="Название сайта">
+      <div class="own"><label for="slogan">Девиз под названием (можно пропустить)</label>
+        <input type="text" id="slogan" maxlength="80" placeholder="Например: Всё самое интересное о древних ящерах"></div>
+    </section>
+
+    <section class="card">
+      <div class="step"><span class="num">2</span><h2>О чём сайт?</h2></div>
+      <div class="tiles" id="theme"></div>
+      <div class="own"><label for="themeOwn">✏️ Или напиши свою тему</label>
+        <input type="text" id="themeOwn" maxlength="120" placeholder="Например: сайт про мою коллекцию машинок"></div>
+    </section>
+
+    <section class="card">
+      <div class="step"><span class="num">3</span><h2>Какие цвета?</h2></div>
+      <div class="tiles" id="pal"></div>
+      <div class="pickers" id="pickers">
+        <label><input type="color" id="c0" value="#FFFFFF"> Фон</label>
+        <label><input type="color" id="c1" value="#E63946"> Главный</label>
+        <label><input type="color" id="c2" value="#FFB703"> Акцент</label>
+      </div>
+      <div class="own"><label for="palOwn">✏️ Или опиши цвета словами</label>
+        <input type="text" id="palOwn" maxlength="100" placeholder="Например: чёрный с золотым"></div>
+    </section>
+
+    <section class="card">
+      <div class="step"><span class="num">4</span><h2>Какой стиль?</h2></div>
+      <div class="tiles wide" id="style"></div>
+      <h3>Шрифт</h3>
+      <div class="tiles" id="font"></div>
+    </section>
+
+    <section class="card">
+      <div class="step"><span class="num">5</span><h2>Из каких блоков сайт?</h2></div>
+      <p class="hint">Нажми на блок, чтобы добавить или убрать. Ниже можно поменять порядок.</p>
+      <div class="tiles" id="sec"></div>
+      <h3>Порядок блоков сверху вниз</h3>
+      <ol class="order" id="order"></ol>
+      <h3>Как устроен сайт</h3>
+      <div class="tiles wide" id="layout"></div>
+    </section>
+
+    <section class="card">
+      <div class="step"><span class="num">6</span><h2>Фишки для красоты</h2></div>
+      <p class="hint">Можно выбрать несколько.</p>
+      <div class="tiles" id="extra"></div>
+    </section>
+
+    <section class="card">
+      <div class="step"><span class="num">7</span><h2>Что ещё хочешь?</h2></div>
+      <textarea class="field" id="wish" maxlength="400" placeholder="Например: на главной нарисуй моего кота Барсика, а в карточках расскажи про его любимые игрушки"></textarea>
+    </section>
+  </div>
+
+  <aside>
+    <section class="card">
+      <h2 class="small">Вот твой сайт</h2>
+      <div class="browser" aria-hidden="true">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="site" id="site"></div>
+      </div>
+      <ul class="sum" id="sum"></ul>
+    </section>
+
+    <section class="card">
+      <h2 class="small">Волшебный текст для Qwen</h2>
+      <textarea id="prompt" readonly aria-label="Готовый промпт"></textarea>
+      <button class="btn btn-copy" id="copy" type="button">📋 Скопировать промпт</button>
+      <a class="btn btn-qwen" href="https://chat.qwen.ai/" target="_blank" rel="noopener">🚀 Перейти в Qwen</a>
+      <ol class="how">
+        <li>Нажми <b>«Скопировать промпт»</b>.</li>
+        <li>Нажми <b>«Перейти в Qwen»</b>.</li>
+        <li>Включи режим <b>«Веб-разработка»</b> (или <b>«Артефакты»</b>), если он есть.</li>
+        <li>Вставь текст (Ctrl+V) и отправь. Сайт появится прямо в чате.</li>
+        <li>Хочешь что-то поменять — напиши Qwen, например: «сделай кнопки круглее».</li>
+      </ol>
+    </section>
+  </aside>
+</main>
+
+<script>
+const DATA = {
+  theme: [
+    { em: '🐶', name: 'Мой питомец', desc: 'сайт про домашнего питомца: кто он, его характер, смешные истории, любимые игрушки и советы по уходу' },
+    { em: '🎮', name: 'Видеоигры', desc: 'фан-сайт про видеоигры: любимые жанры, советы новичкам, топ игр, интересные факты' },
+    { em: '⚽', name: 'Спорт', desc: 'сайт про спорт: любимый вид спорта, правила, известные спортсмены, тренировки' },
+    { em: '🍰', name: 'Кафе', desc: 'сайт придуманного уютного кафе: меню с ценами, о кафе, отзывы гостей, как нас найти' },
+    { em: '🧸', name: 'Магазин', desc: 'сайт придуманного магазина игрушек: товары с ценами, акции, отзывы покупателей' },
+    { em: '✈️', name: 'Путешествия', desc: 'блог путешественника: страны и города, интересные места, советы в дорогу' },
+    { em: '🎨', name: 'Художник', desc: 'портфолио юного художника: о себе, галерея работ, техники рисования, контакты' },
+    { em: '🎵', name: 'Музыка', desc: 'сайт придуманной музыкальной группы: участники, песни, концерты, новости' },
+    { em: '🚀', name: 'Космос', desc: 'познавательный сайт про космос: планеты, космонавты, ракеты, удивительные факты' },
+    { em: '🦖', name: 'Динозавры', desc: 'познавательный сайт про динозавров: виды, где жили, чем питались, удивительные факты' },
+    { em: '🎬', name: 'Кино', desc: 'сайт про любимые фильмы и мультфильмы: подборки, рейтинги, интересные факты о съёмках' },
+    { em: '📚', name: 'Книги', desc: 'книжный клуб: подборки книг по возрасту, отзывы читателей, книга месяца' },
+  ],
+  pal: [
+    { name: 'Тетрика', c: ['#F4F0FF', '#6C3BF5', '#FFD43B', '#1E1640'] },
+    { name: 'Океан', c: ['#EAF6FF', '#0077B6', '#00C2A8', '#0B2545'] },
+    { name: 'Лес', c: ['#F1F8EC', '#2D6A4F', '#F4A259', '#1B2E22'] },
+    { name: 'Закат', c: ['#FFF4EC', '#FF6B35', '#F7C548', '#3D1F12'] },
+    { name: 'Конфета', c: ['#FFF0F7', '#FF4FA3', '#7B61FF', '#3A1430'] },
+    { name: 'Неон', c: ['#0F0C29', '#00F5D4', '#F15BB5', '#F5F5FF'] },
+    { name: 'Минимализм', c: ['#FFFFFF', '#111111', '#FF3B30', '#111111'] },
+    { name: 'Пастель', c: ['#FDF6F0', '#7FA7F5', '#FF9F9F', '#3C3C4C'] },
+    { name: 'Свои', own: true },
+  ],
+  style: [
+    { em: '🎈', name: 'Весёлый', desc: 'весёлый и яркий: сильно скруглённые углы (24px), крупные эмодзи, волнистые разделители между блоками, яркие цветные тени у карточек', radius: 18 },
+    { em: '✨', name: 'Современный', desc: 'современный: много воздуха, очень крупные заголовки, мягкие размытые тени, полупрозрачные «стеклянные» карточки (backdrop-blur), плавные градиенты', radius: 12 },
+    { em: '⬛', name: 'Строгий', desc: 'строгий минимализм: мало цвета, тонкие линии-разделители, чёткая сетка, небольшие скругления (8px), без теней', radius: 4 },
+    { em: '👾', name: 'Игровой', desc: 'игровой: неоновое свечение у заголовков и кнопок (text-shadow, box-shadow), фон с тонкой сеткой, рамки с острыми углами', radius: 2 },
+    { em: '🧱', name: 'Комикс', desc: 'комикс: толстые чёрные обводки (3px), жёсткие тени без размытия (6px 6px 0 #000), яркие плашки, слегка повёрнутые наклейки', radius: 10 },
+    { em: '🌸', name: 'Нежный', desc: 'нежный: плавные округлые формы, мягкие градиенты, размытые цветные круги на фоне, тонкий шрифт в тексте', radius: 22 },
+  ],
+  font: [
+    { em: 'Аа', name: 'Округлый', css: 'ui-rounded, "Nunito", sans-serif', desc: 'Nunito (заголовки жирные 800)' },
+    { em: 'Аа', name: 'Современный', css: '"Montserrat", "Avenir Next", sans-serif', desc: 'Montserrat (заголовки 800)' },
+    { em: 'Аа', name: 'Строгий', css: '"Inter", -apple-system, sans-serif', desc: 'Inter (заголовки 700)' },
+    { em: 'Аа', name: 'Рукописный', css: '"Caveat", "Marker Felt", cursive', desc: 'Caveat для заголовков и Nunito для текста' },
+    { em: 'Аа', name: 'Книжный', css: '"Playfair Display", Georgia, serif', desc: 'Playfair Display для заголовков и Inter для текста' },
+  ],
+  sec: [
+    { id: 'about', em: '👋', name: 'О нас', desc: 'короткий рассказ (2–3 абзаца) и 3 карточки-факта с эмодзи' },
+    { id: 'cards', em: '🃏', name: 'Карточки', desc: '6 карточек в сетке (товары, услуги, герои или темы — по смыслу сайта): эмодзи или SVG-иконка, заголовок, 1–2 предложения, при наведении карточка приподнимается' },
+    { id: 'gallery', em: '🖼️', name: 'Галерея', desc: 'сетка из 6 «картинок» — цветные плитки с градиентом и большим эмодзи; по клику открывается увеличенная версия в окне поверх сайта' },
+    { id: 'stats', em: '🔢', name: 'Цифры', desc: '4 больших числа с подписями (например, «120+ довольных гостей»), числа плавно считаются от нуля, когда блок появляется на экране' },
+    { id: 'steps', em: '🗓️', name: 'Шаги', desc: 'таймлайн из 4 шагов или событий с номерами, соединёнными линией' },
+    { id: 'reviews', em: '💬', name: 'Отзывы', desc: '3 отзыва: аватар-эмодзи в круге, имя, звёзды ★★★★★ и текст' },
+    { id: 'prices', em: '💰', name: 'Цены', desc: '3 тарифа или варианта с ценой и списком «что входит», средний выделен как «Популярный»' },
+    { id: 'team', em: '👥', name: 'Команда', desc: '4 карточки людей или персонажей: аватар-эмодзи, имя, роль, весёлый факт' },
+    { id: 'faq', em: '❓', name: 'Вопросы', desc: '5 частых вопросов-аккордеонов: по клику плавно раскрывается ответ' },
+    { id: 'quiz', em: '🎯', name: 'Мини-тест', desc: 'тест из 3 вопросов по теме сайта с вариантами ответа и итогом «Ты ответил верно на 2 из 3!»' },
+    { id: 'form', em: '✉️', name: 'Форма', desc: 'форма «Напиши нам»: имя, сообщение, кнопка; после нажатия показывается «Спасибо! Сообщение отправлено» (на самом деле никуда не отправляется)' },
+    { id: 'contacts', em: '📍', name: 'Контакты', desc: 'адрес, телефон, почта (придуманные) и круглые кнопки соцсетей с иконками' },
+  ],
+  layout: [
+    { em: '📜', name: 'Одна страница', desc: 'одна длинная страница: пункты меню плавно прокручивают к блокам' },
+    { em: '🗂️', name: 'Страницы-вкладки', desc: 'несколько «страниц» в одном файле: пункты меню переключают разделы как вкладки, показан один раздел за раз, активный пункт меню подсвечен. Меню и подвал видны всегда' },
+  ],
+  extra: [
+    { id: 'reveal', em: '🎞️', name: 'Появление', desc: 'блоки плавно появляются снизу при прокрутке (IntersectionObserver)' },
+    { id: 'hover', em: '🖱️', name: 'Наведение', desc: 'кнопки и карточки красиво реагируют на наведение: подъём, тень, смена цвета' },
+    { id: 'dark', em: '🌗', name: 'Тёмная тема', desc: 'кнопка ☀️/🌙 в меню переключает светлую и тёмную тему, выбор запоминается в localStorage' },
+    { id: 'bg', em: '🫧', name: 'Живой фон', desc: 'на главном экране медленно плавают размытые цветные круги (CSS-анимация)' },
+    { id: 'confetti', em: '🎉', name: 'Конфетти', desc: 'при нажатии на главную кнопку из неё вылетает конфетти (рисуется кодом)' },
+    { id: 'typing', em: '⌨️', name: 'Печать', desc: 'девиз на главном экране печатается по буквам, как на машинке' },
+    { id: 'top', em: '⬆️', name: 'Наверх', desc: 'круглая кнопка «наверх» в углу, появляется после прокрутки' },
+  ],
+};
+
+const state = {
+  theme: 9, pal: 0, style: 0, font: 0, layout: 0,
+  extra: new Set(['reveal', 'hover']),
+  order: ['about', 'cards', 'gallery', 'reviews', 'form'],
+};
+const $ = id => document.getElementById(id);
+const OWN = DATA.pal.length - 1;
+
+function buildTiles(key) {
+  DATA[key].forEach((item, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tile';
+    if (key === 'pal') b.innerHTML = item.own
+      ? `<span class="em">🎨</span><span>${item.name}</span>`
+      : `<span class="stripes">${item.c.slice(0, 3).map(c => `<i style="background:${c}"></i>`).join('')}</span><span>${item.name}</span>`;
+    else if (key === 'font') b.innerHTML = `<span class="em" style="font-family:${item.css};font-weight:800">${item.em}</span><span>${item.name}</span>`;
+    else b.innerHTML = `<span class="em">${item.em}</span><span>${item.name}</span>`;
+    b.addEventListener('click', () => {
+      if (key === 'extra') { state.extra.has(item.id) ? state.extra.delete(item.id) : state.extra.add(item.id); }
+      else if (key === 'sec') {
+        const k = state.order.indexOf(item.id);
+        k >= 0 ? state.order.splice(k, 1) : state.order.push(item.id);
+      } else {
+        state[key] = i;
+        if (key === 'theme') $('themeOwn').value = '';
+        if (key === 'pal') $('palOwn').value = '';
+      }
+      update();
+    });
+    $(key).appendChild(b);
+  });
+}
+
+const secById = id => DATA.sec.find(s => s.id === id);
+const val = id => $(id).value.trim();
+const siteName = () => val('name') || 'Мой сайт';
+
+function hexLum(h) {
+  const n = parseInt(h.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= .04 ? v / 12.9 : ((v + .055) / 1.055) ** 2.4; });
+  return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+}
+function colors() {
+  if (state.pal !== OWN) return DATA.pal[state.pal].c;
+  const bg = $('c0').value;
+  return [bg, $('c1').value, $('c2').value, hexLum(bg) > .4 ? '#1E1E2E' : '#F5F5FF'];
+}
+
+function renderOrder() {
+  const rows = [['🧭', 'Меню', 'lock'], ['🌟', 'Главный экран', 'lock'],
+    ...state.order.map(id => { const s = secById(id); return [s.em, s.name, id]; }), ['🔚', 'Подвал', 'lock']];
+  $('order').innerHTML = rows.map(([em, name, id], i) => {
+    if (id === 'lock') return `<li class="lock"><span class="n">${i + 1}</span><span class="sp">${em}&nbsp; ${name}</span>🔒</li>`;
+    const k = state.order.indexOf(id);
+    return `<li><span class="n">${i + 1}</span><span class="sp">${em}&nbsp; ${name}</span>
+      <button class="mv" data-id="${id}" data-d="-1" ${k === 0 ? 'disabled' : ''} aria-label="Выше">↑</button>
+      <button class="mv" data-id="${id}" data-d="1" ${k === state.order.length - 1 ? 'disabled' : ''} aria-label="Ниже">↓</button></li>`;
+  }).join('');
+}
+$('order').addEventListener('click', e => {
+  const b = e.target.closest('.mv'); if (!b) return;
+  const k = state.order.indexOf(b.dataset.id), j = k + Number(b.dataset.d);
+  [state.order[k], state.order[j]] = [state.order[j], state.order[k]];
+  update();
+});
+
+function buildPrompt() {
+  const ownTheme = val('themeOwn'), ownPal = val('palOwn'), slogan = val('slogan'), wish = val('wish');
+  const t = DATA.theme[state.theme], st = DATA.style[state.style], f = DATA.font[state.font];
+  const lay = DATA.layout[state.layout], c = colors();
+  const theme = ownTheme ? `«${ownTheme}». Сам придумай, о чём рассказать в каждом блоке` : `${t.desc}`;
+  const pal = ownPal
+    ? `- Цвета: ${ownPal}. Сам подбери 4 гармоничных цвета (фон, главный, акцент, текст) с хорошим контрастом и задай их в tailwind.config как bg, primary, accent, ink.`
+    : `- Цвета: задай в tailwind.config и используй только их (и их прозрачность, например bg-primary/10):
+  bg ${c[0]} — фон, primary ${c[1]} — главный, accent ${c[2]} — кнопки и выделения, ink ${c[3]} — текст.`;
+  const blocks = [
+    `Меню: название сайта слева (с эмодзи-логотипом), ссылки на блоки справа, меню закреплено сверху с лёгким размытием фона. На телефоне — кнопка-бургер.`,
+    `Главный экран: на всю высоту окна, огромный заголовок «${siteName()}»${slogan ? `, под ним девиз «${slogan}»` : ', под ним короткий девиз'}, главная кнопка-призыв и большая иллюстрация из эмодзи и SVG-фигур.`,
+    ...state.order.map(id => { const s = secById(id); return `${s.name}: ${s.desc}.`; }),
+    `Подвал: название, год ${new Date().getFullYear()}, ссылки меню, строчка «Сайт сделан с помощью Qwen».`,
+  ].map((b, i) => `${i + 1}. ${b}`).join('\n');
+  const extras = DATA.extra.filter(e => state.extra.has(e.id)).map(e => `- ${e.desc}.`).join('\n');
+
+  return `# Задача
+Сделай красивый современный сайт «${siteName()}». Тема: ${theme}.
+Все тексты — на русском, живые и интересные, по теме сайта (никакого lorem ipsum). Пиши так, будто сайт сделал школьник для своих друзей.
+
+# Делай быстро
+1. Сразу пиши код: без плана, рассуждений и вступления.
+2. Один файл index.html одним блоком \`\`\`html.
+3. Подключи только Tailwind (<script src="https://cdn.tailwindcss.com"><\/script>) и шрифт с Google Fonts. Других библиотек нет.
+4. Оформление — классами Tailwind. Свой CSS — только для анимаций. JavaScript — короткий, в конце страницы.
+5. Не больше 400 строк. Код полный, от <!DOCTYPE html> до </html>, без «...» и заглушек.
+6. После кода ничего не пиши.
+
+# Дизайн
+${pal}
+- Стиль: ${st.desc}.
+- Шрифт: ${f.desc}.
+- Картинки: не используй внешние ссылки на фото (они ломаются). Вместо них — крупные эмодзи, простые SVG-иконки прямо в коде, градиенты и декоративные фигуры.
+- Правила красоты: контейнер max-w-6xl по центру; у блоков большие отступы (py-20); фон блоков чередуется (bg и белый/primary с прозрачностью); у каждого блока крупный заголовок; одинаковые скругления и тени по всему сайту; текст всегда хорошо читается на фоне.
+- Сайт адаптивный: на телефоне (375px) всё в одну колонку, нет горизонтальной прокрутки, кнопки удобно нажимать пальцем.
+
+# Структура (${lay.desc})
+${blocks}
+
+${extras ? `# Фишки\n${extras}\n\n` : ''}${wish ? `# Пожелания автора (важно!)\n${wish}\n\n` : ''}# Проверь перед ответом
+- Все пункты меню работают, плавная прокрутка (scroll-behavior: smooth).
+- Нет ошибок в консоли, все кнопки что-то делают.
+- Цвета только из палитры, текст контрастный.`;
+}
+
+function update() {
+  const ownTheme = val('themeOwn'), ownPal = val('palOwn');
+  for (const key of ['theme', 'pal', 'style', 'font', 'layout', 'extra', 'sec']) {
+    [...$(key).children].forEach((b, i) => {
+      const on = key === 'extra' ? state.extra.has(DATA.extra[i].id)
+        : key === 'sec' ? state.order.includes(DATA.sec[i].id)
+        : key === 'theme' ? !ownTheme && state.theme === i
+        : key === 'pal' ? !ownPal && state.pal === i
+        : state[key] === i;
+      b.setAttribute('aria-pressed', on);
+    });
+  }
+  $('pickers').classList.toggle('on', state.pal === OWN && !ownPal);
+  renderOrder();
+
+  const [bg, pr, ac, ink] = ownPal ? ['#F2F2F2', '#888888', '#BBBBBB', '#222222'] : colors();
+  const st = DATA.style[state.style], f = DATA.font[state.font], r = st.radius;
+  const emoji = ownTheme ? '✨' : DATA.theme[state.theme].em;
+  const slogan = val('slogan') || (ownTheme || DATA.theme[state.theme].name);
+  const site = $('site');
+  site.style.background = bg; site.style.color = ink;
+  site.innerHTML = `
+    <div class="s-nav" style="background:${pr};color:${hexLum(pr) > .4 ? '#111' : '#fff'}"><b>${emoji} ${esc(siteName())}</b>
+      <span><i style="background:currentColor"></i><i style="background:currentColor"></i><i style="background:currentColor"></i></span></div>
+    <div class="s-hero"><div><h4 style="font-family:${f.css}">${esc(siteName())}</h4><p>${esc(slogan)}</p>
+      <span class="s-btn" style="background:${ac};color:${hexLum(ac) > .4 ? '#111' : '#fff'};border-radius:${r}px">Начать</span></div>
+      <span class="s-emoji">${emoji}</span></div>
+    ${state.order.map(id => { const s = secById(id); return `<div class="s-sec" style="background:${pr}22;border-radius:${Math.min(r, 12)}px">${s.em} ${s.name}</div>`; }).join('')}`;
+
+  const pal = ownPal ? '🎨 ' + ownPal : state.pal === OWN ? '🎨 Свои цвета' : '🎨 ' + DATA.pal[state.pal].name;
+  $('sum').innerHTML = [ownTheme ? '✏️ ' + ownTheme : DATA.theme[state.theme].em + ' ' + DATA.theme[state.theme].name,
+    pal, st.em + ' ' + st.name, 'Аа ' + f.name, DATA.layout[state.layout].em + ' ' + DATA.layout[state.layout].name,
+    `🧱 Блоков: ${state.order.length + 3}`].map(s => `<li>${esc(s)}</li>`).join('');
+  $('prompt').value = buildPrompt();
+}
+function esc(s) { return s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
+
+async function copyPrompt() {
+  const ta = $('prompt'); let ok = false;
+  try { await navigator.clipboard.writeText(ta.value); ok = true; } catch (e) {
+    ta.select(); try { ok = document.execCommand('copy'); } catch (e2) {}
+    window.getSelection().removeAllRanges();
+  }
+  const btn = $('copy');
+  btn.textContent = ok ? '✅ Скопировано!' : '😕 Выдели текст и нажми Ctrl+C';
+  btn.classList.toggle('done', ok);
+  clearTimeout(copyPrompt.t);
+  copyPrompt.t = setTimeout(() => { btn.textContent = '📋 Скопировать промпт'; btn.classList.remove('done'); }, 2500);
+}
+
+['theme', 'pal', 'style', 'font', 'layout', 'extra', 'sec'].forEach(buildTiles);
+['name', 'slogan', 'themeOwn', 'palOwn', 'wish', 'c0', 'c1', 'c2'].forEach(id => $(id).addEventListener('input', update));
+$('copy').addEventListener('click', copyPrompt);
+update();
+</script>
+</body>
+</html>
